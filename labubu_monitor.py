@@ -8,7 +8,6 @@ print("Bot is starting...")
 
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-
 BLIND_BOX_URL = "https://popmart.com/collections/blind-box"
 
 intents = discord.Intents.default()
@@ -16,7 +15,7 @@ client = discord.Client(intents=intents)
 
 last_seen_stock = {}
 last_post_times = {}
-cooldown_seconds = 30  # Time between duplicate notifications
+cooldown_seconds = 30  # Prevent reposting same item within this time
 
 
 async def check_popmart():
@@ -51,6 +50,9 @@ async def check_popmart():
 
                     in_stock = "add to cart" in btn_text.lower() or "pop now" in btn_text.lower()
 
+                    # Log everything it's checking
+                    print(f"[{datetime.utcnow()}] Checked: {title} → Button: '{btn_text.strip()}' → In Stock: {in_stock}")
+
                     if title not in last_seen_stock:
                         last_seen_stock[title] = "out_of_stock"
 
@@ -66,6 +68,7 @@ async def check_popmart():
                             if img_url:
                                 embed.set_image(url=img_url)
                             await channel.send(embed=embed)
+                            print(f"🚨 POSTED TO DISCORD: {title} was detected IN STOCK!")
                             last_seen_stock[title] = "in_stock"
                             last_post_times[title] = now
 
@@ -75,7 +78,7 @@ async def check_popmart():
             except Exception as e:
                 print(f"Error: {e}")
 
-            await asyncio.sleep(2)  # Check every 2 seconds
+            await asyncio.sleep(2)
 
 
 async def main():
@@ -87,6 +90,7 @@ async def startup():
     await main()
 
 asyncio.run(startup())
+
 
 
 
