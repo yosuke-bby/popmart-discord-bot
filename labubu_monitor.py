@@ -29,8 +29,13 @@ async def check_popmart():
 
         while not client.is_closed():
             try:
-                await page.reload()
-                await page.wait_for_selector(".product-grid-item", timeout=60000)
+                # Try to wait for products to load
+                try:
+                    await page.wait_for_selector(".product-grid-item", timeout=60000, state="attached")
+                except Exception as e:
+                    print(f"⚠️ Could not find product grid: {e}")
+                    await asyncio.sleep(5)
+                    continue
 
                 items = await page.query_selector_all(".product-grid-item")
 
@@ -50,7 +55,7 @@ async def check_popmart():
 
                     in_stock = "add to cart" in btn_text.lower() or "pop now" in btn_text.lower()
 
-                    # Log everything it's checking
+                    # Log what it's doing
                     print(f"[{datetime.utcnow()}] Checked: {title} → Button: '{btn_text.strip()}' → In Stock: {in_stock}")
 
                     if title not in last_seen_stock:
@@ -76,9 +81,9 @@ async def check_popmart():
                         last_seen_stock[title] = "out_of_stock"
 
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"💥 Unexpected Error: {e}")
 
-            await asyncio.sleep(2)
+            await asyncio.sleep(2)  # Check every 2 seconds
 
 
 async def main():
@@ -90,6 +95,7 @@ async def startup():
     await main()
 
 asyncio.run(startup())
+
 
 
 
