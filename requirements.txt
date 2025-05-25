@@ -1,2 +1,4 @@
 discord.py
 aiohttp
+requests
+beautifulsoup4
