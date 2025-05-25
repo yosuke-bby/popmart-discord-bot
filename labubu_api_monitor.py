@@ -7,11 +7,13 @@ from datetime import datetime, timedelta, timezone
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 
+API_URL = "https://prod-na-api.popmart.com/shop/v3/shop/productOnCollection"
+
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 posted_items = {}
-cooldown_seconds = 60
+cooldown_seconds = 60  # Prevent spamming the same item more than once per minute
 
 async def check_popmart_api():
     await client.wait_until_ready()
@@ -19,15 +21,11 @@ async def check_popmart_api():
 
     while not client.is_closed():
         try:
-            now = datetime.now(timezone.utc)
+            response = requests.get(API_URL)
+            data = response.json()
 
-            # 👇 FAKE product data to simulate a restock
-            products = [{
-                "name": "FAKE TEST ITEM",
-                "status": "AVAILABLE",
-                "spuCode": "fake-test-item",
-                "cover": "https://media.tenor.com/2roX3uxz_68AAAAd/cat-space.gif"
-            }]
+            products = data.get("data", {}).get("items", [])
+            now = datetime.now(timezone.utc)
 
             for product in products:
                 title = product.get("name", "No Title")
@@ -65,6 +63,7 @@ async def startup():
     await main()
 
 asyncio.run(startup())
+
 
 
 
