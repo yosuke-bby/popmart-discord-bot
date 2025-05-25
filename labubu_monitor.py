@@ -1,9 +1,10 @@
 import discord
 import asyncio
-print("Bot is starting...")
+import os
+from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
 
-import os
+print("Bot is starting...")
 
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
@@ -14,25 +15,22 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 last_seen_stock = {}
-from datetime import datetime, timedelta
-
-# Track when each item was last posted
 last_post_times = {}
-cooldown_seconds = 30  # Change this value if you want a longer/shorter cooldown
+cooldown_seconds = 30  # Time between duplicate notifications
 
 
 async def check_popmart():
-    global last_seen_stock
     await client.wait_until_ready()
     channel = client.get_channel(CHANNEL_ID)
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
+        await page.goto(BLIND_BOX_URL, timeout=60000)
 
         while not client.is_closed():
             try:
-                await page.goto(BLIND_BOX_URL, timeout=60000)
+                await page.reload()
                 await page.wait_for_selector(".product-grid-item", timeout=60000)
 
                 items = await page.query_selector_all(".product-grid-item")
@@ -56,27 +54,20 @@ async def check_popmart():
                     if title not in last_seen_stock:
                         last_seen_stock[title] = "out_of_stock"
 
-                    from datetime import datetime, timedelta  # Make sure this is at the top of your file
-
-# Add these just once, at the top of your file outside the loop:
-last_post_times = {}
-cooldown_seconds = 30
-
-# Then, inside the loop, replace the send logic with this:
-if in_stock and last_seen_stock[title] != "in_stock":
-    now = datetime.utcnow()
-    last_post_time = last_post_times.get(title, datetime.min)
-    if (now - last_post_time) > timedelta(seconds=cooldown_seconds):
-        embed = discord.Embed(
-            title=f"🚨 {title} is now available!",
-            url=product_url,
-            description="Click fast before it sells out!"
-        )
-        if img_url:
-            embed.set_image(url=img_url)
-        await channel.send(embed=embed)
-        last_seen_stock[title] = "in_stock"
-        last_post_times[title] = now
+                    if in_stock and last_seen_stock[title] != "in_stock":
+                        now = datetime.utcnow()
+                        last_post_time = last_post_times.get(title, datetime.min)
+                        if (now - last_post_time) > timedelta(seconds=cooldown_seconds):
+                            embed = discord.Embed(
+                                title=f"🚨 {title} is now available!",
+                                url=product_url,
+                                description="Click fast before it sells out!"
+                            )
+                            if img_url:
+                                embed.set_image(url=img_url)
+                            await channel.send(embed=embed)
+                            last_seen_stock[title] = "in_stock"
+                            last_post_times[title] = now
 
                     elif not in_stock:
                         last_seen_stock[title] = "out_of_stock"
@@ -86,7 +77,7 @@ if in_stock and last_seen_stock[title] != "in_stock":
 
             await asyncio.sleep(2)  # Check every 2 seconds
 
-@client.event
+
 async def main():
     async with client:
         await client.start(TOKEN)
@@ -96,5 +87,6 @@ async def startup():
     await main()
 
 asyncio.run(startup())
+
 
 
