@@ -3,8 +3,11 @@ import asyncio
 print("Bot is starting...")
 from playwright.async_api import async_playwright
 
-TOKEN = "MTM3NjAwNzgxMTM3NjM0OTI0OA.Gz2D2b.65yo4EJuj-bpg7aL0aJ1a-YJ_3-hzq-6eAnx20"  # Replace with your token
-CHANNEL_ID = 1376007185099657247  # Replace with your channel ID
+import os
+
+TOKEN = os.getenv("TOKEN")
+CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
+
 BLIND_BOX_URL = "https://popmart.com/collections/blind-box"
 
 intents = discord.Intents.default()
