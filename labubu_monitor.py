@@ -25,11 +25,16 @@ async def check_popmart():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
+
+        # ✅ Spoof a real browser to bypass bot detection
+        await page.set_extra_http_headers({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        })
+
         await page.goto(BLIND_BOX_URL, timeout=60000)
 
         while not client.is_closed():
             try:
-                # Try to wait for products to load
                 try:
                     await page.wait_for_selector(".product-grid-item", timeout=60000, state="attached")
                 except Exception as e:
@@ -55,7 +60,6 @@ async def check_popmart():
 
                     in_stock = "add to cart" in btn_text.lower() or "pop now" in btn_text.lower()
 
-                    # Log what it's doing
                     print(f"[{datetime.utcnow()}] Checked: {title} → Button: '{btn_text.strip()}' → In Stock: {in_stock}")
 
                     if title not in last_seen_stock:
@@ -83,7 +87,7 @@ async def check_popmart():
             except Exception as e:
                 print(f"💥 Unexpected Error: {e}")
 
-            await asyncio.sleep(2)  # Check every 2 seconds
+            await asyncio.sleep(2)
 
 
 async def main():
@@ -95,6 +99,7 @@ async def startup():
     await main()
 
 asyncio.run(startup())
+
 
 
 
