@@ -23,15 +23,20 @@ async def check_popmart():
     channel = client.get_channel(CHANNEL_ID)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        # ✅ Switch to Firefox (more stable in some environments)
+        browser = await p.firefox.launch(headless=True)
         page = await browser.new_page()
 
-        # ✅ Spoof a real browser to bypass bot detection
+        # ✅ Spoof real browser headers
         await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0"
         })
 
         await page.goto(BLIND_BOX_URL, timeout=60000)
+
+        # ✅ Print the page contents for debugging
+        html = await page.content()
+        print(f"🔎 PAGE HTML START\n{html[:1000]}\n🔍 PAGE HTML END")
 
         while not client.is_closed():
             try:
@@ -99,6 +104,8 @@ async def startup():
     await main()
 
 asyncio.run(startup())
+
+
 
 
 
