@@ -2,7 +2,7 @@ import requests
 import discord
 import asyncio
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
@@ -13,7 +13,7 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 posted_items = {}
-cooldown_seconds = 60
+cooldown_seconds = 60  # Minimum time before reposting same product
 
 async def check_popmart_api():
     await client.wait_until_ready()
@@ -25,7 +25,7 @@ async def check_popmart_api():
             data = response.json()
 
             products = data.get("data", {}).get("items", [])
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             for product in products:
                 title = product.get("name", "No Title")
@@ -35,7 +35,7 @@ async def check_popmart_api():
                 img_url = product.get("cover", "")
 
                 if available:
-                    last_post = posted_items.get(title, datetime.min)
+                    last_post = posted_items.get(title, datetime.min.replace(tzinfo=timezone.utc))
                     if (now - last_post) > timedelta(seconds=cooldown_seconds):
                         embed = discord.Embed(
                             title=f"🚨 {title} is in stock!",
@@ -44,8 +44,9 @@ async def check_popmart_api():
                         )
                         if img_url:
                             embed.set_image(url=img_url)
+
                         await channel.send(embed=embed)
-                        print(f"[{now}] POSTED: {title}")
+                        print(f"[{now.isoformat()}] POSTED: {title}")
                         posted_items[title] = now
 
         except Exception as e:
@@ -62,4 +63,5 @@ async def startup():
     await main()
 
 asyncio.run(startup())
+
 
