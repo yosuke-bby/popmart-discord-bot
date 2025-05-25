@@ -1,4 +1,3 @@
-
 import discord
 import asyncio
 import requests
@@ -27,7 +26,6 @@ async def check_blindboxes():
         try:
             response = requests.get(BLIND_BOX_URL)
             data = response.json()
-
             products = data.get("data", {}).get("items", [])
             now = datetime.now(timezone.utc)
 
@@ -94,10 +92,10 @@ async def check_popnow():
 
         await asyncio.sleep(10)
 
-async def main():
-    await client.wait_until_ready()
+@client.event
+async def on_ready():
+    print(f"✅ Logged in as {client.user}")
     asyncio.create_task(check_blindboxes())
     asyncio.create_task(check_popnow())
-    await client.start(TOKEN)
 
-asyncio.run(main())
+client.run(TOKEN)
