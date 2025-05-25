@@ -127,7 +127,7 @@ async def check_amazon():
                         img_tag = soup.select_one("#landingImage")
                         img_url = img_tag["src"] if img_tag else None
 
-                        is_out_of_stock = soup.find(text=lambda t: "Currently unavailable" in t)
+                        is_out_of_stock = soup.find(string=lambda s: s and "currently unavailable" in s.lower())
                         in_stock = not is_out_of_stock
 
                         now = datetime.now(timezone.utc)
