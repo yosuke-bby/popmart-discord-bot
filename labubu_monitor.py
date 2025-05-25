@@ -23,18 +23,19 @@ async def check_popmart():
     channel = client.get_channel(CHANNEL_ID)
 
     async with async_playwright() as p:
-        # ✅ Switch to Firefox (more stable in some environments)
+        # ✅ Use Firefox for better JS rendering
         browser = await p.firefox.launch(headless=True)
         page = await browser.new_page()
 
-        # ✅ Spoof real browser headers
+        # ✅ Spoof a real browser
         await page.set_extra_http_headers({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0"
         })
 
         await page.goto(BLIND_BOX_URL, timeout=60000)
+        await asyncio.sleep(5)  # ⏳ Give the page time to render products with JS
 
-        # ✅ Print the page contents for debugging
+        # Debug: show page content (optional — comment out if not needed)
         html = await page.content()
         print(f"🔎 PAGE HTML START\n{html[:1000]}\n🔍 PAGE HTML END")
 
@@ -104,6 +105,7 @@ async def startup():
     await main()
 
 asyncio.run(startup())
+
 
 
 
