@@ -1,8 +1,8 @@
 import discord
 import asyncio
 import aiohttp
-from bs4 import BeautifulSoup
 import os
+from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 
 TOKEN = os.getenv("TOKEN")
@@ -12,6 +12,7 @@ AMAZON_CHANNEL_ID = int(os.getenv("AMAZON_CHANNEL_ID"))
 BLIND_BOX_URL = "https://prod-na-api.popmart.com/shop/v3/shop/productOnCollection"
 POP_NOW_URL = "https://prod-na-api.popmart.com/shop/v1/box/box_set/extract"
 POP_NOW_PAGE = "https://www.popmart.com/pages/popnow"
+
 AMAZON_URLS = [
     "https://www.amazon.com/POP-MART-Big-into-Energy/dp/B0DT44TSM2?th=1",
     "https://www.amazon.com/POP-MART-Big-into-Energy/dp/B0DT41V371?ref_=ast_sto_dp&th=1",
@@ -23,7 +24,7 @@ client = discord.Client(intents=intents)
 
 blindbox_posted = {}
 popnow_last_alert = None
-amazon_last_alert = {}
+amazon_posted = {}
 cooldown_seconds = 60
 
 async def check_blindboxes():
@@ -50,27 +51,29 @@ async def check_blindboxes():
                         last_post = blindbox_posted.get(title, datetime.min.replace(tzinfo=timezone.utc))
                         if (now - last_post) > timedelta(seconds=cooldown_seconds):
                             embed = discord.Embed(
-                                title="🧸 Pop Mart Restock Detected",
-                                description=f"**In-Stock Item:** [{title}]({product_url})",
-                                color=0xff4f8b,
-                                timestamp=now
+                                title=f"🧸 Restock Detected: {title}",
+                                url=product_url,
+                                description="**Status:** In Stock
+**Store:** popmart.com",
+                                color=discord.Color.green()
                             )
-                            embed.add_field(name="Store", value="PopMart.com", inline=True)
-                            embed.add_field(name="Status", value="🟢 Available", inline=True)
-                            embed.add_field(name="Link", value=f"[Click to Buy]({product_url})", inline=False)
+                            embed.set_footer(text=f"Pop Mart Monitor | Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S')}")
                             if img_url:
                                 embed.set_thumbnail(url=img_url)
 
                             await channel.send(embed=embed)
+                            print(f"[{now.isoformat()}] POSTED BLINDBOX: {title}")
                             blindbox_posted[title] = now
 
             except Exception as e:
                 print(f"Error checking Blind Box API: {e}")
+
             await asyncio.sleep(10)
 
 async def check_popnow():
     await client.wait_until_ready()
     channel = client.get_channel(POP_CHANNEL_ID)
+
     global popnow_last_alert
 
     async with aiohttp.ClientSession() as session:
@@ -87,35 +90,35 @@ async def check_popnow():
                     now = datetime.now(timezone.utc)
                     if not popnow_last_alert or (now - popnow_last_alert) > timedelta(seconds=cooldown_seconds):
                         embed = discord.Embed(
-                            title="🎁 Pop Now Labubu Restock",
-                            description="Boxes are available now!",
-                            color=0xff9900,
-                            timestamp=now
+                            title="🎉 Pop Now Labubu Boxes Available!",
+                            url=POP_NOW_PAGE,
+                            description="**Status:** In Stock
+**Store:** popmart.com",
+                            color=discord.Color.green()
                         )
-                        embed.add_field(name="Store", value="PopMart.com", inline=True)
-                        embed.add_field(name="Status", value="🟢 Available", inline=True)
-                        embed.add_field(name="Link", value=f"[Open Pop Now Page]({POP_NOW_PAGE})", inline=False)
+                        embed.set_footer(text=f"Pop Mart Monitor | Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S')}")
                         if img_url:
                             embed.set_thumbnail(url=img_url)
 
                         await channel.send(embed=embed)
+                        print(f"[{now.isoformat()}] POSTED POPNOW ALERT")
                         popnow_last_alert = now
 
             except Exception as e:
                 print(f"Error checking Pop Now API: {e}")
+
             await asyncio.sleep(10)
 
 async def check_amazon():
     await client.wait_until_ready()
     channel = client.get_channel(AMAZON_CHANNEL_ID)
-    global amazon_last_alert
 
     async with aiohttp.ClientSession() as session:
         while not client.is_closed():
             for url in AMAZON_URLS:
                 try:
-                    async with session.get(url, timeout=10) as resp:
-                        text = await resp.text()
+                    async with session.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"}) as response:
+                        text = await response.text()
                         soup = BeautifulSoup(text, "html.parser")
 
                         title_tag = soup.select_one("#productTitle")
@@ -127,28 +130,29 @@ async def check_amazon():
                         img_tag = soup.select_one("#landingImage")
                         img_url = img_tag["src"] if img_tag else None
 
-                        is_out_of_stock = soup.find(string=lambda s: s and "currently unavailable" in s.lower())
-                        in_stock = not is_out_of_stock
+                        availability = soup.select_one("#availability")
+                        availability_text = availability.get_text(strip=True).lower() if availability else ""
+                        in_stock = "in stock" in availability_text and "currently unavailable" not in availability_text
 
-                        now = datetime.now(timezone.utc)
-                        last_post = amazon_last_alert.get(url, datetime.min.replace(tzinfo=timezone.utc))
+                        if in_stock:
+                            last_post = amazon_posted.get(url, datetime.min.replace(tzinfo=timezone.utc))
+                            now = datetime.now(timezone.utc)
+                            if (now - last_post) > timedelta(seconds=cooldown_seconds):
+                                embed = discord.Embed(
+                                    title="📦 Restock Detected",
+                                    url=url,
+                                    description=f"**Store:** amazon.com
+**In-Stock Item:** {title}
+**Price:** {price}",
+                                    color=discord.Color.green()
+                                )
+                                embed.set_footer(text=f"Amazon Monitor | Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+                                if img_url:
+                                    embed.set_thumbnail(url=img_url)
 
-                        if in_stock and (now - last_post > timedelta(seconds=cooldown_seconds)):
-                            embed = discord.Embed(
-                                title="📦 Amazon Restock Alert",
-                                description=f"**In-Stock Item:** [{title}]({url})",
-                                color=0x4caf50,
-                                timestamp=now
-                            )
-                            embed.add_field(name="Store", value="Amazon.com", inline=True)
-                            embed.add_field(name="Price", value=price, inline=True)
-                            embed.add_field(name="Buy", value=f"[Add to Cart]({url})", inline=False)
-                            if img_url:
-                                embed.set_thumbnail(url=img_url)
-
-                            await channel.send(embed=embed)
-                            amazon_last_alert[url] = now
-
+                                await channel.send(embed=embed)
+                                print(f"[{now.isoformat()}] POSTED AMAZON RESTOCK: {title}")
+                                amazon_posted[url] = now
                 except Exception as e:
                     print(f"Error checking Amazon URL {url}: {e}")
 
