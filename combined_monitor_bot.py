@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 
 TOKEN = os.getenv("TOKEN")
-CHANNEL_ID = int(os.getenv("CHANNEL_ID"))  # Pop Mart restocks
-AMAZON_CHANNEL_ID = int(os.getenv("AMAZON_CHANNEL_ID"))  # Amazon restocks
+CHANNEL_ID = int(os.getenv("CHANNEL_ID"))  # Pop Mart alerts
+AMAZON_CHANNEL_ID = int(os.getenv("AMAZON_CHANNEL_ID"))  # Amazon alerts
 
 BLIND_BOX_URL = "https://prod-na-api.popmart.com/shop/v3/shop/productOnCollection"
 POP_NOW_URL = "https://prod-na-api.popmart.com/shop/v1/box/box_set/extract"
@@ -23,7 +23,7 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 blindbox_posted = {}
-popnow_last_alert = None
+popnow_in_stock = False
 amazon_last_alert = {}
 cooldown_seconds = 60
 
@@ -68,7 +68,7 @@ async def check_blindboxes():
 async def check_popnow():
     await client.wait_until_ready()
     channel = client.get_channel(CHANNEL_ID)
-    global popnow_last_alert
+    global popnow_in_stock
 
     async with aiohttp.ClientSession() as session:
         while not client.is_closed():
@@ -78,20 +78,23 @@ async def check_popnow():
 
                 box_list = data.get("data", {}).get("box_list", [])
                 img_url = data.get("data", {}).get("set_main_pic", "")
-                available_boxes = [box for box in box_list if box.get("state") == 1]
+                available = any(box.get("state") == 1 for box in box_list)
 
-                if available_boxes:
-                    now = datetime.now(timezone.utc)
-                    if not popnow_last_alert or (now - popnow_last_alert) > timedelta(seconds=cooldown_seconds):
-                        embed = discord.Embed(
-                            title="🚨 Pop Now Labubu Restock!",
-                            description=f"**Status:** Boxes Available!\n[Play Now]({POP_NOW_PAGE})",
-                            color=discord.Color.orange()
-                        )
-                        if img_url:
-                            embed.set_thumbnail(url=img_url)
-                        await channel.send(embed=embed)
-                        popnow_last_alert = now
+                if available and not popnow_in_stock:
+                    embed = discord.Embed(
+                        title="🚨 Pop Now Labubu Crate Restocked!",
+                        description=f"Boxes are available to open!\n[Go to Pop Now]({POP_NOW_PAGE})",
+                        color=discord.Color.orange()
+                    )
+                    if img_url:
+                        embed.set_thumbnail(url=img_url)
+                    await channel.send(embed=embed)
+                    print("[Pop Now] Restock alert sent.")
+                    popnow_in_stock = True
+
+                elif not available and popnow_in_stock:
+                    print("[Pop Now] Stock is empty again.")
+                    popnow_in_stock = False
 
             except Exception as e:
                 print(f"Error checking Pop Now API: {e}")
